@@ -6,7 +6,7 @@ const verifyToken = (req, res, next) => {
     const token = authHeader && authHeader.split(' ')[1];
 
     if(!token){
-        return res.status(401).json({message: 'Access denied. no Token Provided'});
+        return res.status(401).json({message: 'Access denied. no Token Provided Please login to access this resource.'});
     }
 
     try{
@@ -14,7 +14,8 @@ const verifyToken = (req, res, next) => {
         req.user = verified;
         next();
     }catch(err){
-        res.status(403).json({message: 'Invalid or Expired Token.'});
+        res.status(403).json({message: 'Invalid or Expired Token, Please login again to access this resource.'});
+        console.error('Token verification error:', err);
     }
 
 };

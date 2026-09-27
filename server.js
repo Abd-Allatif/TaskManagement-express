@@ -28,6 +28,6 @@ app.use((req, res, next) => {
 // Global Error Handling Middleware
 app.use(errorHandler);
 
-const server = app.listen(PORT, () => {
+app.listen(PORT, () => {
   console.log("server is running on http://localhost:" + PORT);
 });
