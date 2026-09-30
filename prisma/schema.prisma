@@ -7,25 +7,51 @@ generator client {
 }
 
 model User {
-    id             String    @id @default(uuid(7))
-    name           String
-    email          String    @unique
-    emailVerifiedAt DateTime? @map("email_verified_at")
-    password       String
-    createdAt      DateTime  @default(now()) @map("created_at")
+    id                 String              @id @default(uuid(7))
+    name               String
+    email              String              @unique
+    emailVerifiedAt    DateTime?           @map("email_verified_at")
+    isVerified         Boolean             @default(false) @map("is_verified")
+    password           String
+    createdAt          DateTime            @default(now()) @map("created_at")
+    verificationTokens VerificationToken[]
 
     @@map("users")
 }
 
 model Admin {
-    id             String    @id @default(uuid(7))
-    name           String
-    email          String    @unique
-    emailVerifiedAt DateTime? @map("email_verified_at")
-    password       String
-    createdAt      DateTime  @default(now()) @map("created_at")
+    id                      String                   @id @default(uuid(7))
+    name                    String
+    email                   String                   @unique
+    emailVerifiedAt         DateTime?                @map("email_verified_at")
+    isVerified              Boolean                  @default(false) @map("is_verified")
+    password                String
+    createdAt               DateTime                 @default(now()) @map("created_at")
+    adminVerificationTokens AdminVerificationToken[]
 
     @@map("admins")
+}
+
+model VerificationToken {
+    id        String   @id @default(uuid(7))
+    token     String   @unique
+    expiresAt DateTime @map("expires_at")
+    userId    String   @map("user_id")
+    user      User     @relation(fields: [userId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+    createdAt DateTime @default(now())
+
+    @@map("verification_tokens")
+}
+
+model AdminVerificationToken {
+    id        String   @id @default(uuid(7))
+    token     String   @unique
+    expiresAt DateTime @map("expires_at")
+    adminId   String   @map("admin_id")
+    admin     Admin    @relation(fields: [adminId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+    createdAt DateTime @default(now())
+
+    @@map("admin_verification_tokens")
 }
 
 model Status {

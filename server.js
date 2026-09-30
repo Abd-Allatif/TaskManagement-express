@@ -1,6 +1,6 @@
 const express = require("express");
 const cors = require("cors");
-const path = require("path");
+const { join } = require("path");
 const errorHandler = require("./middleware/errorHandler");
 require("dotenv").config();
 
@@ -10,9 +10,8 @@ const PORT = process.env.PORT || 3000;
 app.use(cors());
 app.use(express.json());
 
-
 app.get("/", (req, res) => {
-  res.sendFile(path.join(__dirname, "public", "index.html"));
+  res.sendFile(join(__dirname, "public", "index.html"));
 });
 
 // --- PLACEHOLDER FOR FUTURE ROUTES ---

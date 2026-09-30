@@ -4,7 +4,7 @@
   "description": "A Task Managment System to Manage Tasks between Employees",
   "license": "ISC",
   "author": "Abd-Allatif",
-  "type": "module",
+  "type": "commonjs",
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
