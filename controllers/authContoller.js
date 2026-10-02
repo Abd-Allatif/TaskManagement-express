@@ -1,5 +1,6 @@
 const bycrypt = require("bycrypt");
 const prisma = require("../prismaClient");
+const jwt = require("jsonwebtoken");
 const { sendVerificationEmail } = require("../utils/emailService");
 
 // Register
@@ -113,7 +114,7 @@ const verifyEmail = async (req, res) => {
   }
 };
 
-// 3. LOGIN (With Verification Gating)
+// 3. LOGIN (With Verification Gating & JWT Issuance)
 const login = async (req, res) => {
   try {
     const { email, password } = req.body;
@@ -127,7 +128,7 @@ const login = async (req, res) => {
       return res.status(401).json({ error: "Invalid email or password." });
     }
 
-    const isPasswordValid = await bycrypt.compare(password, user.password);
+    const isPasswordValid = await bcrypt.compare(password, user.password);
     if (!isPasswordValid) {
       return res.status(401).json({ error: "Invalid email or password." });
     }
@@ -142,8 +143,16 @@ const login = async (req, res) => {
       });
     }
 
+    // CREATE AND ASSIGN JWT TOKEN HERE
+    const token = jwt.sign(
+      { userId: user.id, email: user.email },
+      process.env.JWT_SECRET,
+      { expiresIn: process.env.JWT_EXPIRES_IN || "7d" }
+    );
+
     return res.status(200).json({
       message: "Login successful!",
+      token, // Return token to client so they can use it with your verifyToken middleware
       user: { id: user.id, name: user.name, email: user.email },
     });
   } catch (error) {
@@ -155,6 +164,7 @@ const login = async (req, res) => {
 // 4. LOGOUT
 const logout = async (req, res) => {
   try {
+    // Since JWTs are stateless on the server, client-side removal handles log out.
     return res.status(200).json({ message: "Logged out successfully." });
   } catch (error) {
     console.error("Logout error:", error);
