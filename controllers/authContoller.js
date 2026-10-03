@@ -1,7 +1,7 @@
-const bycrypt = require("bycrypt");
+const bcrypt = require("bcrypt");
 const prisma = require("../prismaClient");
 const jwt = require("jsonwebtoken");
-const { sendVerificationEmail } = require("../utils/emailService");
+const { sendVerificationEmail } = require("../services/emailService");
 
 // Register
 const register = async (req, res) => {
@@ -22,7 +22,7 @@ const register = async (req, res) => {
       return res.status(400).json({ message: "User Email Already Exists" });
     }
 
-    const hashedPassword = await bycrypt.hash(password, 10);
+    const hashedPassword = await bcrypt.hash(password, 10);
 
     const newUser = await prisma.user.create({
       data: { name, email, password: hashedPassword },
