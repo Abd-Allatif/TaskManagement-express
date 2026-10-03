@@ -4,13 +4,14 @@ const {
   verifyEmail,
   login,
   logout,
-} = require("../controllers/authContoller");
+} = require("../controllers/authContoller.js");
+const { registerRules,loginRules, validate } = require("../middleware/validators/authValidators.js");
 
 const router = express.Router();
 
-router.post("/register", register);
+router.post("/register",registerRules, validate ,register);
 router.post("/verify-email", verifyEmail);
-router.post("/login", login);
+router.post("/login",loginRules, validate, login);
 router.post("/logout", logout);
 
 module.exports = router;

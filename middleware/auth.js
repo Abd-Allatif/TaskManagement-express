@@ -14,8 +14,8 @@ const verifyToken = (req, res, next) => {
         req.user = verified;
         next();
     }catch(err){
-        res.status(403).json({message: 'Invalid or Expired Token, Please login again to access this resource.'});
         console.error('Token verification error:', err);
+        return res.status(403).json({message: 'Invalid or Expired Token, Please login again to access this resource.'});
     }
 
 };
