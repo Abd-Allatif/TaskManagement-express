@@ -1,3 +1,4 @@
+require("dotenv").config();
 const express = require("express");
 const cors = require("cors");
 const helmet = require("helmet");
@@ -6,8 +7,6 @@ const { join } = require("path");
 const errorHandler = require("./middleware/errorHandler");
 // const verifyToken = require("./middleware/auth");
 const authRoutes = require("./routes/authRoutes");
-
-require("dotenv").config();
 
 const app = express();
 const PORT = process.env.PORT || 3000;
