@@ -1,7 +1,7 @@
 const bcrypt = require("bcrypt");
-const prisma = require("../prismaClient");
 const jwt = require("jsonwebtoken");
-const { sendVerificationEmail } = require("../services/emailService");
+const { sendVerificationEmail } = require("../../services/emailService");
+const authRepository = require("../../repository/Authentication/authRepository");
 
 // Register
 const register = async (req, res) => {
@@ -15,7 +15,7 @@ const register = async (req, res) => {
       });
   }
 
-  const existingUser = await prisma.user.findUnique({ where: { email } });
+  const existingUser = await authRepository.findByEmail(email);
 
   if (existingUser) {
     return res.status(400).json({ message: "User Email Already Exists" });
@@ -23,8 +23,10 @@ const register = async (req, res) => {
 
   const hashedPassword = await bcrypt.hash(password, 10);
 
-  const newUser = await prisma.user.create({
-    data: { name, email, password: hashedPassword },
+  const newUser = await authRepository.createUser({
+    name,
+    email,
+    password: hashedPassword,
   });
 
   const verfificationCode = Math.floor(
@@ -32,12 +34,10 @@ const register = async (req, res) => {
   ).toString();
   const expiresAt = new Date(Date.now() + 10 * 60 * 1000); // 10 Minutes from now
 
-  await prisma.verificationToken.create({
-    data: {
-      token: verfificationCode,
-      expiresAt,
-      userId: newUser.id,
-    },
+  await authRepository.createVerificationToken({
+    token: verfificationCode,
+    expiresAt,
+    userId: newUser.id,
   });
 
   await sendVerificationEmail(email, verfificationCode);
@@ -61,10 +61,7 @@ const verifyEmail = async (req, res) => {
       .json({ message: "Email and Verification Code are Required" });
   }
 
-  const user = await prisma.user.findUnique({
-    where: { email },
-    include: { verificationTokens: true },
-  });
+  const user = await authRepository.findByEmailWithTokens(email);
 
   if (!user) {
     return res
@@ -89,15 +86,7 @@ const verifyEmail = async (req, res) => {
   }
 
   // Update user's verification timestamp and drop/delete the token safely via transaction
-  await prisma.$transaction([
-    prisma.user.update({
-      where: { id: user.id },
-      data: { emailVerifiedAt: new Date() },
-    }),
-    prisma.verificationToken.delete({
-      where: { id: isValidToken.id },
-    }),
-  ]);
+  await authRepository.consumeVerificationToken(user.id, isValidToken.id);
 
   return res
     .status(200)
@@ -112,7 +101,7 @@ const login = async (req, res) => {
     return res.status(400).json({ error: "Email and password are required." });
   }
 
-  const user = await prisma.user.findUnique({ where: { email } });
+  const user = await authRepository.findByEmail(email);
   if (!user) {
     return res.status(401).json({ error: "Invalid email or password." });
   }

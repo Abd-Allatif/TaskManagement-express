@@ -6,7 +6,7 @@ const rateLimit = require("express-rate-limit");
 const { join } = require("path");
 const errorHandler = require("./middleware/errorHandler");
 // const verifyToken = require("./middleware/auth");
-const authRoutes = require("./routes/authRoutes");
+const authRoutes = require("./routes/Authentication/authRoutes");
 
 const app = express();
 const PORT = process.env.PORT || 3000;

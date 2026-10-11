@@ -4,8 +4,8 @@ const {
   verifyEmail,
   login,
   logout,
-} = require("../controllers/authContoller.js");
-const { registerRules,loginRules, validate } = require("../middleware/validators/authValidators.js");
+} = require("../../controllers/Authentication/authController.js");
+const { registerRules,loginRules, validate } = require("../../middleware/validators/authValidators.js");
 
 const router = express.Router();
 
