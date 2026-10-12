@@ -28,7 +28,7 @@ const prisma = require("../prismaClient");
 const bcrypt = require("bcrypt");
 const jwt = require("jsonwebtoken");
 const { sendVerificationEmail } = require("../services/emailService");
-const { register, verifyEmail, login, logout } = require("../controllers/authContoller");
+const { register, verifyEmail, login, logout } = require("../controllers/Authentication/authController");
 
 const mockRes = () => {
   const res = {};

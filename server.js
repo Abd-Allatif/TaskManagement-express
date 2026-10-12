@@ -5,8 +5,8 @@ const helmet = require("helmet");
 const rateLimit = require("express-rate-limit");
 const { join } = require("path");
 const errorHandler = require("./middleware/errorHandler");
-// const verifyToken = require("./middleware/auth");
 const authRoutes = require("./routes/Authentication/authRoutes");
+const taskRoutes = require("./routes/Task/taskRoutes");
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -48,8 +48,7 @@ app.get("/" , (req, res) => {
 
 app.use('/api/auth',authLimiter, authRoutes);
 
-// --- PLACEHOLDER FOR FUTURE ROUTES ---
-// e.g., app.use('/api/tasks', require('./routes/taskRoutes'));
+app.use("/api/tasks", taskRoutes);
 
 // 404 Route Not Found Middleware (Catches unmatched URLs)
 app.use((req, res, next) => {

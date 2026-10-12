@@ -11,6 +11,7 @@
     "dev": "nodemon server.js",
     "lint": "eslint .",
     "test": "jest",
+    "seed": "node prisma/seeds/seed.js",
     "postinstall": "prisma skills sync || exit 0"
   },
   "dependencies": {
