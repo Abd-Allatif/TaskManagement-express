@@ -8,6 +8,7 @@ const errorHandler = require("./middleware/errorHandler");
 const authRoutes = require("./routes/Authentication/authRoutes");
 const taskRoutes = require("./routes/Task/taskRoutes");
 const categoryRoutes = require("./routes/Category/categoryRoutes");
+const adminRoutes = require("./routes/Admin/adminRoutes");
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -51,6 +52,8 @@ app.use('/api/auth',authLimiter, authRoutes);
 
 app.use("/api/tasks", taskRoutes);
 app.use("/api/categories", categoryRoutes);
+
+app.use('/api/admin/auth', authLimiter, adminRoutes);
 
 // 404 Route Not Found Middleware (Catches unmatched URLs)
 app.use((req, res, next) => {

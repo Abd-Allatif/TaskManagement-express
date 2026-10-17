@@ -22,7 +22,7 @@ router.get("/", getTasks);
 router.get("/:id", getTaskById);
 
 // Update
-router.put("/:id", updateTask);
+router.put("/:id",createTaskRules,validate , updateTask);
 
 // Delete (soft)
 router.delete("/:id", deleteTask);

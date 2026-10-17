@@ -11,7 +11,15 @@ const verifyToken = (req, res, next) => {
 
     try{
         const verified = jwt.verify(token, process.env.JWT_SECRET);
-        req.user = verified;
+
+        // Normalize the payload so downstream code can rely on `id` and `type`
+        // regardless of whether the token was issued to a user or an admin.
+        req.user = {
+            ...verified,
+            id: verified.adminId || verified.userId,
+            type: verified.type || "USER",
+        };
+
         next();
     }catch(err){
         console.error('Token verification error:', err);
