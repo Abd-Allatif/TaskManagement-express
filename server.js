@@ -65,6 +65,10 @@ app.use((req, res, next) => {
 // Global Error Handling Middleware
 app.use(errorHandler);
 
-app.listen(PORT, () => {
-  console.log("server is running on http://localhost:" + PORT);
-});
+module.exports = app;
+
+if (require.main === module) {
+  app.listen(PORT, () => {
+    console.log("server is running on http://localhost:" + PORT);
+  });
+}

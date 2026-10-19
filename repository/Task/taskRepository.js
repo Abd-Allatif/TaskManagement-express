@@ -79,7 +79,7 @@ const findExistingCategoryIds = async (ids) => {
   return found.map((c) => c.id);
 };
 
-const findExistingAssingables = async (assignments) => {
+const findExistingAssignables = async (assignments) => {
   if(!assignments?.length) return [];
 
   const users = await prisma.user.findMany({
@@ -118,7 +118,7 @@ module.exports = {
   getTasks,
   getStatusByCode,
   findExistingCategoryIds,
-  findExistingAssingables,
+  findExistingAssignables,
   updateTask,
   deleteTask,
   taskInclude,

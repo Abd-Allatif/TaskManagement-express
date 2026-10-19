@@ -34,7 +34,7 @@ const createTask = async (req, res) => {
   }
 
   // Validate assignment IDs exist
-  const validAssignables = await taskRepository.findExistingAssingables(assignments);
+  const validAssignables = await taskRepository.findExistingAssignables(assignments);
   const invalidAssignments = (assignments || []).filter(
     (a) => !validAssignables.includes(a.assignableId)
   );

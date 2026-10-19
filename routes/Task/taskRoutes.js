@@ -7,7 +7,7 @@ const {
   updateTask,
   deleteTask,
 } = require("../../controllers/Task/taskController");
-const { createTaskRules, validate } = require("../../middleware/validators/taskValidators");
+const { createTaskRules,updateTaskRules, validate } = require("../../middleware/validators/taskValidators");
 
 const router = express.Router();
 
@@ -22,7 +22,7 @@ router.get("/", getTasks);
 router.get("/:id", getTaskById);
 
 // Update
-router.put("/:id",createTaskRules,validate , updateTask);
+router.put("/:id",updateTaskRules,validate , updateTask);
 
 // Delete (soft)
 router.delete("/:id", deleteTask);

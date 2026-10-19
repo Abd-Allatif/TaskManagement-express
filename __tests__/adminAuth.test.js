@@ -15,6 +15,13 @@ const mockRes = () => {
 beforeEach(() => {
   jest.clearAllMocks();
   process.env.JWT_SECRET = "test-secret";
+  // The invalid-token test intentionally triggers the middleware's error logging;
+  // silence it so the test output stays clean.
+  jest.spyOn(console, "error").mockImplementation(() => {});
+});
+
+afterEach(() => {
+  jest.restoreAllMocks();
 });
 
 describe("verifyAdmin", () => {
