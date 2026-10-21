@@ -87,7 +87,7 @@ const sendVerificationEmail = async (
             </div>
             <div class="email-body">
               <p>Hello <strong>${name}</strong>,</p>
-              <p>Thank you for registering! Please use the verification code below to verify your email address. This code is valid for <strong>15 minutes</strong>.</p>
+              <p>Thank you for registering! Please use the verification code below to verify your email address. This code is valid for <strong>10 minutes</strong>.</p>
               
               <div class="code-box">
                 ${verificationCode}
@@ -111,7 +111,7 @@ const sendVerificationEmail = async (
       '"Task Management System" <no-reply@taskmanagement.com>',
     to: toEmail,
     subject: "Verify You Email Address - Task Management System",
-    text: `Hello ${name},\n\nYour verification code is: ${verificationCode}\n\nThis code is valid for 15 minutes.\n\nIf you did not request this, please ignore this email.\n\nBest regards,\nTask Management Team`,
+    text: `Hello ${name},\n\nYour verification code is: ${verificationCode}\n\nThis code is valid for 10 minutes.\n\nIf you did not request this, please ignore this email.\n\nBest regards,\nTask Management Team`,
     html: htmlTemplate,
   };
 

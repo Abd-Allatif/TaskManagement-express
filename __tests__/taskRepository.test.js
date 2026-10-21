@@ -4,6 +4,7 @@ jest.mock("../prismaClient", () => ({
     findFirst: jest.fn(),
     findMany: jest.fn(),
     update: jest.fn(),
+    count: jest.fn(),
   },
   status: {
     findUnique: jest.fn(),
@@ -17,6 +18,14 @@ jest.mock("../prismaClient", () => ({
   admin: {
     findMany: jest.fn(),
   },
+  categoryTaskPivot: {
+    deleteMany: jest.fn(),
+    createMany: jest.fn(),
+  },
+  taskAssignment: {
+    deleteMany: jest.fn(),
+    createMany: jest.fn(),
+  },
   $transaction: jest.fn(),
 }));
 
@@ -27,6 +36,8 @@ beforeEach(() => {
   jest.clearAllMocks();
   // createTask passes a callback to $transaction, so invoke it with prisma as `tx`.
   prisma.$transaction.mockImplementation(async (fn) => fn(prisma));
+  prisma.task.count.mockResolvedValue(0);
+  prisma.task.findFirst.mockResolvedValue({ id: "t1" });
 });
 
 describe("createTask", () => {
@@ -124,6 +135,62 @@ describe("getTasks", () => {
 
     expect(prisma.task.findMany.mock.calls[0][0].where.endFlag).toBe(true);
   });
+
+  it("searches title and description and returns pagination metadata", async () => {
+    prisma.task.findMany.mockResolvedValue([{ id: "t1" }]);
+    prisma.task.count.mockResolvedValue(1);
+
+    const result = await taskRepository.getTasks({ search: "deploy", page: 2, limit: 5 });
+
+    const arg = prisma.task.findMany.mock.calls[0][0];
+    expect(arg.where.OR).toEqual([
+      { title: { contains: "deploy" } },
+      { description: { contains: "deploy" } },
+    ]);
+    expect(arg.skip).toBe(5);
+    expect(arg.take).toBe(5);
+    expect(result).toEqual({
+      tasks: [{ id: "t1" }],
+      total: 1,
+      page: 2,
+      limit: 5,
+      totalPages: 1,
+    });
+  });
+
+  it("defaults to page 1, limit 10 and clamps oversized limits", async () => {
+    prisma.task.findMany.mockResolvedValue([]);
+    prisma.task.count.mockResolvedValue(0);
+
+    const result = await taskRepository.getTasks({ limit: 500 });
+
+    const arg = prisma.task.findMany.mock.calls[0][0];
+    expect(arg.skip).toBe(0);
+    expect(arg.take).toBe(100);
+    expect(result.page).toBe(1);
+    expect(result.limit).toBe(100);
+    expect(result.totalPages).toBe(0);
+  });
+
+  it("honours sortBy and sortOrder", async () => {
+    prisma.task.findMany.mockResolvedValue([]);
+
+    await taskRepository.getTasks({ sortBy: "deadline", sortOrder: "asc" });
+
+    expect(prisma.task.findMany.mock.calls[0][0].orderBy).toEqual({
+      deadline: "asc",
+    });
+  });
+
+  it("falls back to createDate desc for an unknown sort field", async () => {
+    prisma.task.findMany.mockResolvedValue([]);
+
+    await taskRepository.getTasks({ sortBy: "hacked", sortOrder: "sideways" });
+
+    expect(prisma.task.findMany.mock.calls[0][0].orderBy).toEqual({
+      createDate: "desc",
+    });
+  });
 });
 
 describe("getStatusByCode", () => {
@@ -190,6 +257,53 @@ describe("updateTask", () => {
       data: { title: "New" },
       include: expect.any(Object),
     });
+  });
+
+  it("skips the transaction for a scalar-only update", async () => {
+    prisma.task.update.mockResolvedValue({ id: "t1" });
+
+    await taskRepository.updateTask("t1", { title: "New" });
+
+    expect(prisma.$transaction).not.toHaveBeenCalled();
+    expect(prisma.categoryTaskPivot.deleteMany).not.toHaveBeenCalled();
+    expect(prisma.taskAssignment.deleteMany).not.toHaveBeenCalled();
+  });
+
+  it("replaces categories and assignments in a transaction when provided", async () => {
+    const result = await taskRepository.updateTask("t1", {
+      title: "New",
+      categories: ["c1"],
+      assignments: [{ assignableType: "USER", assignableId: "u1" }],
+    });
+
+    expect(prisma.$transaction).toHaveBeenCalledTimes(1);
+    expect(prisma.categoryTaskPivot.deleteMany).toHaveBeenCalledWith({
+      where: { taskId: "t1" },
+    });
+    expect(prisma.categoryTaskPivot.createMany).toHaveBeenCalledWith({
+      data: [{ taskId: "t1", categoryId: "c1" }],
+    });
+    expect(prisma.taskAssignment.deleteMany).toHaveBeenCalledWith({
+      where: { taskId: "t1" },
+    });
+    expect(prisma.taskAssignment.createMany).toHaveBeenCalledWith({
+      data: [{ taskId: "t1", assignableType: "USER", assignableId: "u1" }],
+    });
+    expect(prisma.task.findFirst).toHaveBeenCalled();
+    expect(result).toEqual({ id: "t1" });
+  });
+
+  it("clears relations when an empty array is supplied", async () => {
+    await taskRepository.updateTask("t1", { categories: [], assignments: [] });
+
+    expect(prisma.categoryTaskPivot.deleteMany).toHaveBeenCalledWith({
+      where: { taskId: "t1" },
+    });
+    expect(prisma.categoryTaskPivot.createMany).not.toHaveBeenCalled();
+    expect(prisma.taskAssignment.deleteMany).toHaveBeenCalledWith({
+      where: { taskId: "t1" },
+    });
+    expect(prisma.taskAssignment.createMany).not.toHaveBeenCalled();
   });
 });
 

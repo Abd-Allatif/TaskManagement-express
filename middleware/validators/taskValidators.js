@@ -86,6 +86,26 @@ const updateTaskRules = [
     .optional()
     .isBoolean()
     .withMessage("endFlag must be a boolean"),
+
+  body("categories")
+    .optional()
+    .isArray()
+    .withMessage("Categories must be an array"),
+
+  body("categories.*").isUUID().withMessage("Each category must be a valid ID"),
+
+  body("assignments")
+    .optional()
+    .isArray()
+    .withMessage("Assignments must be an array"),
+
+  body("assignments.*.assignableType")
+    .isIn(["USER", "ADMIN"])
+    .withMessage("assignableType must be USER or ADMIN"),
+
+  body("assignments.*.assignableId")
+    .isUUID()
+    .withMessage("Each assignable must be a valid ID"),
 ];
 
 const validate = (req, res, next) => {

@@ -7,6 +7,7 @@ jest.mock("../prismaClient", () => ({
   adminVerificationToken: {
     create: jest.fn(),
     delete: jest.fn(),
+    deleteMany: jest.fn(),
   },
   $transaction: jest.fn(),
 }));
@@ -28,7 +29,7 @@ const prisma = require("../prismaClient");
 const bcrypt = require("bcrypt");
 const jwt = require("jsonwebtoken");
 const { sendVerificationEmail } = require("../services/emailService");
-const { register, verifyEmail, login, logout } = require("../controllers/Admin/adminController");
+const { register, verifyEmail, login, logout, resendCode, getMe } = require("../controllers/Admin/adminController");
 
 const mockRes = () => {
   const res = {};
@@ -194,10 +195,12 @@ describe("verifyEmail", () => {
     await verifyEmail({ body: { email: "a@b.com", code: "123456" } }, res);
 
     expect(prisma.$transaction).toHaveBeenCalledTimes(1);
-    expect(prisma.admin.update).toHaveBeenCalledWith({
-      where: { id: "a1" },
-      data: { emailVerifiedAt: expect.any(Date) },
-    });
+    expect(prisma.admin.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { id: "a1" },
+        data: expect.objectContaining({ emailVerifiedAt: expect.any(Date), isVerified: true }),
+      })
+    );
     expect(prisma.adminVerificationToken.delete).toHaveBeenCalledWith({ where: { id: "t1" } });
     expect(res.status).toHaveBeenCalledWith(200);
   });
@@ -274,5 +277,85 @@ describe("logout", () => {
     await logout({}, res);
 
     expect(res.status).toHaveBeenCalledWith(200);
+  });
+});
+
+describe("resendCode", () => {
+  it("returns 400 and does not touch the DB when the email is missing", async () => {
+    const res = mockRes();
+    await resendCode({ body: {} }, res);
+
+    expect(res.status).toHaveBeenCalledWith(400);
+    expect(prisma.admin.findUnique).not.toHaveBeenCalled();
+  });
+
+  it("returns 404 for an unknown email", async () => {
+    prisma.admin.findUnique.mockResolvedValue(null);
+    const res = mockRes();
+
+    await resendCode({ body: { email: "a@b.com" } }, res);
+
+    expect(res.status).toHaveBeenCalledWith(404);
+  });
+
+  it("returns 400 when the email is already verified", async () => {
+    prisma.admin.findUnique.mockResolvedValue({ id: "a1", emailVerifiedAt: new Date() });
+    const res = mockRes();
+
+    await resendCode({ body: { email: "a@b.com" } }, res);
+
+    expect(res.status).toHaveBeenCalledWith(400);
+    expect(sendVerificationEmail).not.toHaveBeenCalled();
+  });
+
+  it("invalidates old tokens, issues a fresh code and emails it", async () => {
+    prisma.admin.findUnique.mockResolvedValue({
+      id: "a1", name: "Abd", emailVerifiedAt: null,
+    });
+    prisma.adminVerificationToken.deleteMany.mockResolvedValue({ count: 1 });
+    prisma.adminVerificationToken.create.mockResolvedValue({});
+    const res = mockRes();
+
+    await resendCode({ body: { email: "a@b.com" } }, res);
+
+    expect(prisma.adminVerificationToken.deleteMany).toHaveBeenCalledWith({
+      where: { adminId: "a1" },
+    });
+    const tokenData = prisma.adminVerificationToken.create.mock.calls[0][0].data;
+    expect(tokenData.token).toMatch(/^\d{6}$/);
+    expect(sendVerificationEmail).toHaveBeenCalledWith(
+      "a@b.com",
+      expect.any(String),
+      "Abd"
+    );
+    expect(res.status).toHaveBeenCalledWith(200);
+  });
+});
+
+describe("getMe", () => {
+  it("returns 200 with the profile for the token's admin", async () => {
+    prisma.admin.findUnique.mockResolvedValue({
+      id: "a1", name: "Abd", email: "a@b.com", emailVerifiedAt: new Date(),
+    });
+    const res = mockRes();
+
+    await getMe({ user: { id: "a1", type: "ADMIN" } }, res);
+
+    expect(prisma.admin.findUnique).toHaveBeenCalledWith({ where: { id: "a1" } });
+    expect(res.status).toHaveBeenCalledWith(200);
+    expect(res.json).toHaveBeenCalledWith(
+      expect.objectContaining({
+        admin: expect.objectContaining({ id: "a1", type: "ADMIN" }),
+      })
+    );
+  });
+
+  it("returns 404 when the admin no longer exists", async () => {
+    prisma.admin.findUnique.mockResolvedValue(null);
+    const res = mockRes();
+
+    await getMe({ user: { id: "ghost", type: "ADMIN" } }, res);
+
+    expect(res.status).toHaveBeenCalledWith(404);
   });
 });

@@ -2,6 +2,7 @@ const authValidators = require("../middleware/validators/authValidators");
 const adminValidators = require("../middleware/validators/adminValidators");
 const taskValidators = require("../middleware/validators/taskValidators");
 const categoryValidators = require("../middleware/validators/categoryValidators");
+const statusValidators = require("../middleware/validators/statusValidators");
 
 const VALID_UUID = "123e4567-e89b-12d3-a456-426614174000";
 const PAST_ISO = new Date(Date.now() - 3600000).toISOString();
@@ -217,6 +218,37 @@ describe("task validators", () => {
     );
     expect(res.status).toHaveBeenCalledWith(400);
   });
+
+  it("updateTaskRules rejects a non-array categories field", async () => {
+    const { res } = await runValidation(
+      taskValidators.updateTaskRules,
+      taskValidators.validate,
+      { categories: "nope" }
+    );
+    expect(res.status).toHaveBeenCalledWith(400);
+  });
+
+  it("updateTaskRules rejects an invalid assignment type", async () => {
+    const { res } = await runValidation(
+      taskValidators.updateTaskRules,
+      taskValidators.validate,
+      { assignments: [{ assignableType: "ROBOT", assignableId: VALID_UUID }] }
+    );
+    expect(res.status).toHaveBeenCalledWith(400);
+  });
+
+  it("updateTaskRules accepts relation updates", async () => {
+    const { res, next } = await runValidation(
+      taskValidators.updateTaskRules,
+      taskValidators.validate,
+      {
+        categories: [VALID_UUID],
+        assignments: [{ assignableType: "ADMIN", assignableId: VALID_UUID }],
+      }
+    );
+    expect(next).toHaveBeenCalled();
+    expect(res.status).not.toHaveBeenCalled();
+  });
 });
 
 describe("category validators", () => {
@@ -262,6 +294,84 @@ describe("category validators", () => {
       categoryValidators.updateCategoryRules,
       categoryValidators.validate,
       { color: "#fff" }
+    );
+    expect(next).toHaveBeenCalled();
+    expect(res.status).not.toHaveBeenCalled();
+  });
+});
+
+describe("resend code validators", () => {
+  it("auth resendCodeRules rejects a missing email", async () => {
+    const { res } = await runValidation(
+      authValidators.resendCodeRules,
+      authValidators.validate,
+      {}
+    );
+    expect(res.status).toHaveBeenCalledWith(400);
+  });
+
+  it("auth resendCodeRules rejects an invalid email", async () => {
+    const { res } = await runValidation(
+      authValidators.resendCodeRules,
+      authValidators.validate,
+      { email: "nope" }
+    );
+    expect(res.status).toHaveBeenCalledWith(400);
+  });
+
+  it("auth resendCodeRules accepts a valid email", async () => {
+    const { res, next } = await runValidation(
+      authValidators.resendCodeRules,
+      authValidators.validate,
+      { email: "a@b.com" }
+    );
+    expect(next).toHaveBeenCalled();
+    expect(res.status).not.toHaveBeenCalled();
+  });
+
+  it("admin resendCodeRules rejects a missing email", async () => {
+    const { res } = await runValidation(
+      adminValidators.resendCodeRules,
+      adminValidators.validate,
+      {}
+    );
+    expect(res.status).toHaveBeenCalledWith(400);
+  });
+});
+
+describe("status validators", () => {
+  it("statusRules rejects a missing code", async () => {
+    const { res } = await runValidation(
+      statusValidators.statusRules,
+      statusValidators.validate,
+      { label: "Pending" }
+    );
+    expect(res.status).toHaveBeenCalledWith(400);
+  });
+
+  it("statusRules rejects a missing label", async () => {
+    const { res } = await runValidation(
+      statusValidators.statusRules,
+      statusValidators.validate,
+      { code: "PENDING" }
+    );
+    expect(res.status).toHaveBeenCalledWith(400);
+  });
+
+  it("statusRules rejects an over-long code", async () => {
+    const { res } = await runValidation(
+      statusValidators.statusRules,
+      statusValidators.validate,
+      { code: "x".repeat(51), label: "Pending" }
+    );
+    expect(res.status).toHaveBeenCalledWith(400);
+  });
+
+  it("statusRules accepts a valid payload", async () => {
+    const { res, next } = await runValidation(
+      statusValidators.statusRules,
+      statusValidators.validate,
+      { code: "PENDING", label: "Pending" }
     );
     expect(next).toHaveBeenCalled();
     expect(res.status).not.toHaveBeenCalled();

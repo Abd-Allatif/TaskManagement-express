@@ -37,6 +37,16 @@ const loginRules = [
   body("password").trim().notEmpty().withMessage("Password is required"),
 ];
 
+const resendCodeRules = [
+  body("email")
+    .trim()
+    .notEmpty()
+    .withMessage("Email is required")
+    .isEmail()
+    .withMessage("Invalid Email format")
+    .normalizeEmail(),
+];
+
 // MiddleWare
 
 const validate = (req, res, next) => {
@@ -57,5 +67,6 @@ const validate = (req, res, next) => {
 module.exports = {
   registerRules,
   loginRules,
+  resendCodeRules,
   validate,
 };

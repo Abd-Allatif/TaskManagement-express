@@ -1,5 +1,6 @@
 const express = require("express");
 const verifyToken = require("../../middleware/auth");
+const verifyAdmin = require("../../middleware/adminAuth");
 const {
   createCategory,
   getCategories,
@@ -15,15 +16,17 @@ const {
 
 const router = express.Router();
 
+// Any authenticated principal can read categories.
 router.use(verifyToken);
 
-router.post("/", createCategoryRules, validate, createCategory);
+// Writes are admin-only.
+router.post("/", verifyAdmin, createCategoryRules, validate, createCategory);
 
 router.get("/", getCategories);
 router.get("/:id", getCategoryById);
 
-router.put("/:id", updateCategoryRules, validate, updateCategory);
+router.put("/:id", verifyAdmin, updateCategoryRules, validate, updateCategory);
 
-router.delete("/:id", deleteCategory);
+router.delete("/:id", verifyAdmin, deleteCategory);
 
 module.exports = router;

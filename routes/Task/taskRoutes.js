@@ -1,5 +1,6 @@
 const express = require("express");
 const verifyToken = require("../../middleware/auth");
+const { taskOwnerOrAdmin } = require("../../middleware/authorization");
 const {
   createTask,
   getTaskById,
@@ -21,10 +22,10 @@ router.post("/", createTaskRules, validate, createTask);
 router.get("/", getTasks);
 router.get("/:id", getTaskById);
 
-// Update
-router.put("/:id",updateTaskRules,validate , updateTask);
+// Update (owner or admin only)
+router.put("/:id",updateTaskRules,validate , taskOwnerOrAdmin, updateTask);
 
-// Delete (soft)
-router.delete("/:id", deleteTask);
+// Delete (soft) — owner or admin only
+router.delete("/:id", taskOwnerOrAdmin, deleteTask);
 
 module.exports = router;

@@ -141,9 +141,70 @@ const logout = async (req, res) => {
   return res.status(200).json({ message: "Logged out successfully." });
 };
 
+// 5. RESEND VERIFICATION CODE
+const resendCode = async (req, res) => {
+  const { email } = req.body;
+
+  if (!email) {
+    return res.status(400).json({ message: "Email is required" });
+  }
+
+  const user = await authRepository.findByEmail(email);
+
+  if (!user) {
+    return res
+      .status(404)
+      .json({ message: "User Not Found Please Check Your Email, or Register First" });
+  }
+
+  if (user.emailVerifiedAt) {
+    return res.status(400).json({ message: "Email Already Verified" });
+  }
+
+  const verificationCode = Math.floor(
+    100000 + Math.random() * 900000,
+  ).toString();
+  const expiresAt = new Date(Date.now() + 10 * 60 * 1000); // 10 Minutes from now
+
+  // Invalidate any previous codes so only the newest one stays valid.
+  await authRepository.deleteVerificationTokensByUserId(user.id);
+  await authRepository.createVerificationToken({
+    token: verificationCode,
+    expiresAt,
+    userId: user.id,
+  });
+
+  await sendVerificationEmail(email, verificationCode, user.name);
+
+  return res
+    .status(200)
+    .json({ message: "Verification Code Resent Please Check Your Email" });
+};
+
+// 6. CURRENT PROFILE
+const getMe = async (req, res) => {
+  const user = await authRepository.findById(req.user.id);
+
+  if (!user) {
+    return res.status(404).json({ message: "User Not Found" });
+  }
+
+  return res.status(200).json({
+    user: {
+      id: user.id,
+      name: user.name,
+      email: user.email,
+      emailVerifiedAt: user.emailVerifiedAt,
+      type: req.user.type,
+    },
+  });
+};
+
 module.exports = {
   register,
   verifyEmail,
   login,
   logout,
+  resendCode,
+  getMe,
 };

@@ -8,6 +8,48 @@ const taskInclude = {
   subTasks: true,
 };
 
+const DEFAULT_PAGE = 1;
+const DEFAULT_LIMIT = 10;
+const MAX_LIMIT = 100;
+
+// Only these columns may be used for ordering — prevents arbitrary keys from
+// reaching Prisma's `orderBy`.
+const SORTABLE_FIELDS = [
+  "createDate",
+  "deadline",
+  "title",
+  "createdAt",
+  "endFlag",
+];
+
+// Normalizes `page`/`limit` query strings, clamping them to sane bounds.
+const parsePagination = (filters = {}) => {
+  const page = Math.max(1, parseInt(filters.page, 10) || DEFAULT_PAGE);
+  const limit = Math.min(
+    MAX_LIMIT,
+    Math.max(1, parseInt(filters.limit, 10) || DEFAULT_LIMIT)
+  );
+
+  return { page, limit, skip: (page - 1) * limit };
+};
+
+// Builds the shared `where` clause for listing tasks.
+const buildTaskWhere = (filters = {}) => ({
+  deletedAt: null,
+  ...(filters.statusId && { statusId: filters.statusId }),
+  ...(filters.createdById && {
+    createdById: filters.createdById,
+    createdByType: filters.createdByType,
+  }),
+  ...(filters.endFlag !== undefined && { endFlag: filters.endFlag }),
+  ...(filters.search && {
+    OR: [
+      { title: { contains: filters.search } },
+      { description: { contains: filters.search } },
+    ],
+  }),
+});
+
 // CRUD
 
 // Create
@@ -49,21 +91,31 @@ const getTaskById = async (id) => {
 };
 
 const getTasks = async (filters = {}) => {
-  return prisma.task.findMany({
-    where: {
-      deletedAt: null,
-      ...(filters.statusId && { statusId: filters.statusId }),
-      ...(filters.createdById && {
-        createdById: filters.createdById,
-        createdByType: filters.createdByType,
-      }),
-      ...(filters.endFlag !== undefined && { endFlag: filters.endFlag }),
-    },
-    include: taskInclude,
-    orderBy: {
-      createDate: "desc",
-    },
-  });
+  const { page, limit, skip } = parsePagination(filters);
+  const where = buildTaskWhere(filters);
+  const sortBy = SORTABLE_FIELDS.includes(filters.sortBy)
+    ? filters.sortBy
+    : "createDate";
+  const sortOrder = filters.sortOrder === "asc" ? "asc" : "desc";
+
+  const [tasks, total] = await Promise.all([
+    prisma.task.findMany({
+      where,
+      include: taskInclude,
+      orderBy: { [sortBy]: sortOrder },
+      skip,
+      take: limit,
+    }),
+    prisma.task.count({ where }),
+  ]);
+
+  return {
+    tasks,
+    total,
+    page,
+    limit,
+    totalPages: total === 0 ? 0 : Math.ceil(total / limit),
+  };
 };
 
 const getStatusByCode = (code) => prisma.status.findUnique({ where: { code } });
@@ -95,12 +147,52 @@ const findExistingAssignables = async (assignments) => {
 };
 
 // Update
-
+// A scalar-only update keeps the original behaviour. When categories or
+// assignments are supplied the relations are replaced inside a transaction so
+// the task and its relations stay consistent.
 const updateTask = async (id, data) => {
-  return prisma.task.update({
-    where: { id },
-    data: data,
-    include: taskInclude,
+  const { categories, assignments, ...taskData } = data;
+
+  if (categories === undefined && assignments === undefined) {
+    return prisma.task.update({
+      where: { id },
+      data: taskData,
+      include: taskInclude,
+    });
+  }
+
+  return prisma.$transaction(async (tx) => {
+    await tx.task.update({
+      where: { id },
+      data: taskData,
+    });
+
+    if (categories !== undefined) {
+      await tx.categoryTaskPivot.deleteMany({ where: { taskId: id } });
+      if (categories.length > 0) {
+        await tx.categoryTaskPivot.createMany({
+          data: categories.map((categoryId) => ({ taskId: id, categoryId })),
+        });
+      }
+    }
+
+    if (assignments !== undefined) {
+      await tx.taskAssignment.deleteMany({ where: { taskId: id } });
+      if (assignments.length > 0) {
+        await tx.taskAssignment.createMany({
+          data: assignments.map(({ assignableType, assignableId }) => ({
+            taskId: id,
+            assignableType,
+            assignableId,
+          })),
+        });
+      }
+    }
+
+    return tx.task.findFirst({
+      where: { id, deletedAt: null },
+      include: taskInclude,
+    });
   });
 };
 

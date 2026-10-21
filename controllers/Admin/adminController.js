@@ -134,9 +134,70 @@ const logout = async (req, res) => {
   return res.status(200).json({ message: "Logged out successfully." });
 };
 
+// Resend Verification Code
+const resendCode = async (req, res) => {
+  const { email } = req.body;
+
+  if (!email) {
+    return res.status(400).json({ message: "Email is required" });
+  }
+
+  const admin = await adminRepository.findByEmail(email);
+
+  if (!admin) {
+    return res.status(404).json({
+      message: "Admin not found. Please check your email or register first.",
+    });
+  }
+
+  if (admin.emailVerifiedAt) {
+    return res.status(400).json({ message: "Email already verified" });
+  }
+
+  const verificationCode = Math.floor(
+    100000 + Math.random() * 900000
+  ).toString();
+  const expiresAt = new Date(Date.now() + 10 * 60 * 1000); // 10 Minutes from now
+
+  // Invalidate any previous codes so only the newest one stays valid.
+  await adminRepository.deleteVerificationTokensByAdminId(admin.id);
+  await adminRepository.createVerificationToken({
+    token: verificationCode,
+    expiresAt,
+    adminId: admin.id,
+  });
+
+  await sendVerificationEmail(email, verificationCode, admin.name);
+
+  return res
+    .status(200)
+    .json({ message: "Verification code resent. Please check your email." });
+};
+
+// Current Profile
+const getMe = async (req, res) => {
+  const admin = await adminRepository.findById(req.user.id);
+
+  if (!admin) {
+    return res.status(404).json({ message: "Admin not found." });
+  }
+
+  return res.status(200).json({
+    admin: {
+      id: admin.id,
+      name: admin.name,
+      email: admin.email,
+      emailVerifiedAt: admin.emailVerifiedAt,
+      type: req.user.type,
+    },
+  });
+};
+
 module.exports = {
   register,
   verifyEmail,
   login,
   logout,
+  resendCode,
+  getMe,
 };

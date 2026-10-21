@@ -36,6 +36,16 @@ const adminLoginRules = [
   body("password").trim().notEmpty().withMessage("Password is required"),
 ];
 
+const resendCodeRules = [
+  body("email")
+    .trim()
+    .notEmpty()
+    .withMessage("Email is required")
+    .isEmail()
+    .withMessage("Invalid email format")
+    .normalizeEmail(),
+];
+
 const validate = (req, res, next) => {
   const errors = validationResult(req);
 
@@ -52,5 +62,6 @@ const validate = (req, res, next) => {
 module.exports = {
   adminRegisterRules,
   adminLoginRules,
+  resendCodeRules,
   validate,
 };

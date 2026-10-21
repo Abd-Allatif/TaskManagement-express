@@ -4,6 +4,7 @@ jest.mock("../prismaClient", () => ({
     findFirst: jest.fn(),
     findMany: jest.fn(),
     update: jest.fn(),
+    count: jest.fn(),
   },
   status: {
     findUnique: jest.fn(),
@@ -16,6 +17,14 @@ jest.mock("../prismaClient", () => ({
   },
   admin: {
     findMany: jest.fn(),
+  },
+  categoryTaskPivot: {
+    deleteMany: jest.fn(),
+    createMany: jest.fn(),
+  },
+  taskAssignment: {
+    deleteMany: jest.fn(),
+    createMany: jest.fn(),
   },
   $transaction: jest.fn(),
 }));
@@ -40,7 +49,7 @@ const mockReq = (overrides = {}) => ({
   body: {},
   params: {},
   query: {},
-  user: { userId: "user-1", email: "test@example.com" },
+  user: { userId: "user-1", email: "test@example.com", type: "USER", id: "user-1" },
   ...overrides,
 });
 
@@ -49,6 +58,8 @@ beforeEach(() => {
   process.env.JWT_SECRET = "test-secret";
   // $transaction receives a callback function, not an array
   prisma.$transaction.mockImplementation(async (fn) => fn(prisma));
+  prisma.task.count.mockResolvedValue(0);
+  prisma.task.findFirst.mockResolvedValue({ id: "task-1" });
 });
 
 describe("createTask", () => {
@@ -94,6 +105,23 @@ describe("createTask", () => {
     const createData = prisma.task.create.mock.calls[0][0].data;
     expect(createData.createdByType).toBe("USER");
     expect(createData.createdById).toBe("user-1");
+  });
+
+  it("records an ADMIN creator when the token belongs to an admin", async () => {
+    prisma.task.create.mockResolvedValue({ id: "task-1" });
+    prisma.status.findUnique.mockResolvedValue({ id: "status-1", code: "PENDING" });
+
+    const req = mockReq({
+      body: validBody,
+      user: { adminId: "admin-1", email: "admin@example.com", type: "ADMIN", id: "admin-1" },
+    });
+    const res = mockRes();
+
+    await createTask(req, res);
+
+    const createData = prisma.task.create.mock.calls[0][0].data;
+    expect(createData.createdByType).toBe("ADMIN");
+    expect(createData.createdById).toBe("admin-1");
   });
 
   it("defaults statusId to PENDING when not provided", async () => {
@@ -262,7 +290,42 @@ describe("getTasks", () => {
       })
     );
     expect(res.status).toHaveBeenCalledWith(200);
-    expect(res.json).toHaveBeenCalledWith({ tasks });
+    expect(res.json).toHaveBeenCalledWith(
+      expect.objectContaining({ tasks, pagination: expect.any(Object) })
+    );
+  });
+
+  it("returns pagination metadata alongside the tasks", async () => {
+    prisma.task.findMany.mockResolvedValue([]);
+    prisma.task.count.mockResolvedValue(25);
+
+    const req = mockReq({ query: { page: "3", limit: "10" } });
+    const res = mockRes();
+
+    await getTasks(req, res);
+
+    expect(res.json).toHaveBeenCalledWith({
+      tasks: [],
+      pagination: { page: 3, limit: 10, total: 25, totalPages: 3 },
+    });
+  });
+
+  it("forwards search, sortBy and sortOrder to the repository", async () => {
+    prisma.task.findMany.mockResolvedValue([]);
+
+    const req = mockReq({
+      query: { search: "urgent", sortBy: "deadline", sortOrder: "asc" },
+    });
+    const res = mockRes();
+
+    await getTasks(req, res);
+
+    const arg = prisma.task.findMany.mock.calls[0][0];
+    expect(arg.where.OR).toEqual([
+      { title: { contains: "urgent" } },
+      { description: { contains: "urgent" } },
+    ]);
+    expect(arg.orderBy).toEqual({ deadline: "asc" });
   });
 
   it("passes statusId filter from query", async () => {
@@ -346,6 +409,72 @@ describe("updateTask", () => {
     const res = mockRes();
 
     await expect(updateTask(req, res)).rejects.toMatchObject({ code: "P2025" });
+  });
+
+  it("rejects invalid category IDs when categories are provided", async () => {
+    prisma.category.findMany.mockResolvedValue([{ id: "cat-1" }]);
+
+    const req = mockReq({
+      params: { id: "task-1" },
+      body: { categories: ["cat-1", "bad-cat"] },
+    });
+    const res = mockRes();
+
+    await updateTask(req, res);
+
+    expect(res.status).toHaveBeenCalledWith(400);
+    expect(res.json).toHaveBeenCalledWith({ message: "Invalid category IDs: bad-cat" });
+    expect(prisma.task.update).not.toHaveBeenCalled();
+  });
+
+  it("rejects invalid assignable IDs when assignments are provided", async () => {
+    prisma.user.findMany.mockResolvedValue([{ id: "user-99" }]);
+    prisma.admin.findMany.mockResolvedValue([]);
+
+    const req = mockReq({
+      params: { id: "task-1" },
+      body: {
+        assignments: [
+          { assignableType: "USER", assignableId: "user-99" },
+          { assignableType: "USER", assignableId: "ghost" },
+        ],
+      },
+    });
+    const res = mockRes();
+
+    await updateTask(req, res);
+
+    expect(res.status).toHaveBeenCalledWith(400);
+    expect(res.json).toHaveBeenCalledWith({ message: "Invalid assignable IDs: ghost" });
+    expect(prisma.task.update).not.toHaveBeenCalled();
+  });
+
+  it("forwards categories and assignments for relation replacement", async () => {
+    const updated = { id: "task-1" };
+    prisma.task.update.mockResolvedValue(updated);
+    prisma.task.findFirst.mockResolvedValue(updated);
+    prisma.category.findMany.mockResolvedValue([{ id: "cat-1" }]);
+    prisma.user.findMany.mockResolvedValue([{ id: "user-1" }]);
+    prisma.admin.findMany.mockResolvedValue([]);
+
+    const req = mockReq({
+      params: { id: "task-1" },
+      body: {
+        title: "Updated",
+        categories: ["cat-1"],
+        assignments: [{ assignableType: "USER", assignableId: "user-1" }],
+      },
+    });
+    const res = mockRes();
+
+    await updateTask(req, res);
+
+    expect(prisma.$transaction).toHaveBeenCalledTimes(1);
+    expect(res.status).toHaveBeenCalledWith(200);
+    expect(res.json).toHaveBeenCalledWith({
+      message: "Task updated successfully",
+      task: updated,
+    });
   });
 });
 

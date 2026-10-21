@@ -8,7 +8,9 @@ const errorHandler = require("./middleware/errorHandler");
 const authRoutes = require("./routes/Authentication/authRoutes");
 const taskRoutes = require("./routes/Task/taskRoutes");
 const categoryRoutes = require("./routes/Category/categoryRoutes");
+const statusRoutes = require("./routes/Status/statusRoutes");
 const adminRoutes = require("./routes/Admin/adminRoutes");
+const adminManagementRoutes = require("./routes/Admin/adminManagementRoutes");
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -44,16 +46,26 @@ const authLimiter = rateLimit({
 app.use(express.json());
 // app.use(verifyToken);
 
-app.get("/" , (req, res) => {
+app.get("/", (req, res) => {
   res.sendFile(join(__dirname, "public", "index.html"));
+});
+
+app.get("/health", (req, res) => {
+  res.status(200).json({
+    status: "ok",
+    uptime: process.uptime(),
+    timestamp: new Date().toISOString(),
+  });
 });
 
 app.use('/api/auth',authLimiter, authRoutes);
 
 app.use("/api/tasks", taskRoutes);
 app.use("/api/categories", categoryRoutes);
+app.use("/api/statuses", statusRoutes);
 
 app.use('/api/admin/auth', authLimiter, adminRoutes);
+app.use('/api/admin', adminManagementRoutes);
 
 // 404 Route Not Found Middleware (Catches unmatched URLs)
 app.use((req, res, next) => {
